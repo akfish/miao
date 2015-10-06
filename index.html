@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Miao - HTTP Service Discovery</title>
+    <script type="text/javascript" src="lib/host64.js"></script>
+    <script type="text/javascript">
+      function log(msg) {
+        console.log(msg);
+        document.body.innerHTML += typeof msg === 'object' ? JSON.stringify(msg) : msg;
+        document.body.innerHTML += "<br/>";
+      }
+      function parseHash(hash) {
+        var m = /^#((http|https):\/\/)?([\w\d=+/]+)(:(\d+))?(\/.*?(?=\?|$))?(\?(.*))?/.exec(hash);
+        return {
+          protocol: m[2] === undefined ? "//" : (m[2] + "://"),
+          hosts: Miao.decode(m[3]),
+          port: m[5] === undefined ? "" : (":" + m[5]),
+          path: m[6] === undefined ? "/" : m[6],
+          query: m[7] === undefined ? "" : m[7]
+        };
+      }
+
+      function buildDiscoveryUrl(param) {
+        return param.hosts.map(function (h) {
+          return param.protocol + h + param.port + "/miao.png";
+        });
+      }
+
+      function buildServiceUrl(param) {
+        return param.hosts.map(function (h) {
+          return param.protocol + h + param.port + param.path + param.query;
+        });
+      }
+
+      function Ping(url, callback) {
+        if (!this.inUse) {
+          this.status = 'unchecked';
+          this.inUse = true;
+          this.callback = callback;
+          this.url = url;
+          var _that = this;
+          this.img = new Image();
+          this.img.onload = function () {
+            _that.inUse = false;
+            _that.callback('loaded');
+
+          };
+          this.img.onerror = function (e) {
+            if (_that.inUse) {
+              _that.inUse = false;
+              _that.callback('error');
+            }
+
+          };
+          this.start = new Date().getTime();
+          this.img.src = url;
+          this.timer = setTimeout(function () {
+            if (_that.inUse) {
+              _that.inUse = false;
+              _that.callback('timeout');
+            }
+          }, 1500);
+        }
+      }
+
+      function ready(fn) {
+        if (document.readyState != 'loading'){
+          fn();
+        } else {
+          document.addEventListener('DOMContentLoaded', fn);
+        }
+      }
+
+      ready(function() {
+        var param = parseHash(location.hash);
+        var discoveryUrl = buildDiscoveryUrl(param);
+        var serviceUrl = buildServiceUrl(param);
+        log(param);
+        log(discoveryUrl);
+        log(serviceUrl);
+        var resolved = false;
+        var pings = discoveryUrl.map(function(u, i) {
+          return new Ping(u, function(status) {
+            if (!resolved && status === 'loaded') {
+              log("Navigate to: " + serviceUrl[i]);
+              window.location.href = serviceUrl[i];
+            }
+            log(status + ": " + u);
+          });
+        });
+      });
+    </script>
+  </head>
+  <body>
+
+  </body>
+</html>
